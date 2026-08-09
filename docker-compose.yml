@@ -1,0 +1,36 @@
+services:
+  redis:
+    image: redis:7-alpine
+    mem_limit: 128m
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - audio_storage:/app/storage
+    depends_on:
+      - redis
+    mem_limit: 1g
+
+  worker:
+    build: .
+    command: python worker.py
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      # api and worker are separate containers with separate filesystems — without a
+      # shared volume, the worker could never read audio the api container saved.
+      # This is exactly the seam that pushes local-disk storage toward real object
+      # storage once more than one machine is involved.
+      - audio_storage:/app/storage
+    depends_on:
+      - redis
+    mem_limit: 1g
+
+volumes:
+  audio_storage:
